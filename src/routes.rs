@@ -12,7 +12,7 @@ use crate::{
         ApiError, ApiResult, CreateRoomRequest, CreateRoomResponse, CurrentRoomResponse,
         JoinRoomRequest, RoomListingResponse, SessionToken,
     },
-    services::{player_service, room_service},
+    services::room_service,
     state::AppState,
 };
 
@@ -61,7 +61,7 @@ async fn join_room(
     TypedHeader(SessionToken(token)): TypedHeader<SessionToken>,
     Json(request): Json<JoinRoomRequest>,
 ) -> ApiResult<Json<CurrentRoomResponse>> {
-    let response = player_service::join_room(state.pool, id, token, request)
+    let response = room_service::join_room(state.pool, id, token, request)
         .await
         .map_err(ApiError::from)?;
 
