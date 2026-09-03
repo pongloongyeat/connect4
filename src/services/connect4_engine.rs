@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 const MAX_BOARD_HEIGHT: u8 = 6;
+const CONSECUTIVE_FOR_WIN: u8 = 4;
 
 pub struct BoardState<T> {
     // Maps a coordinate (x, y) to a player ID
@@ -15,27 +16,123 @@ pub struct PlayerMove<T> {
     pub x: u64,
 }
 
-struct PlayerPosition<T> {
-    player_id: T,
-    x: u64,
-    y: u8,
-}
-
 pub enum Connect4Result {
     WinningMove,
     AllowedMove,
-    IllegalMove(String),
+    IllegalMove(&'static str),
 }
 
-pub fn make_move<T>(board_state: BoardState<T>, current_move: PlayerMove<T>) -> Connect4Result {
+pub fn make_move<T>(board_state: BoardState<T>, current_move: PlayerMove<T>) -> Connect4Result
+where
+    T: PartialEq + Clone,
+{
     // Drop token into board
-    let current_height = board_state.heights.get(&current_move.x).unwrap_or(&0);
+    let positions = board_state.positions;
+    let PlayerMove { player_id, x } = current_move;
+    let current_height = board_state.heights.get(&x).unwrap_or(&0).to_owned();
+    let y = current_height;
 
-    // Check horizontal
+    if y + 1 > MAX_BOARD_HEIGHT {
+        return Connect4Result::IllegalMove("Exceeded board height");
+    }
 
-    // Check vertical
-    // Check diagonal (top right to bottom left)
-    // Check diagonal (top left to bottom right)
+    let poi1 = vec![
+        get_position(&positions, &player_id, (x, y), (-2, 0)),
+        get_position(&positions, &player_id, (x, y), (-1, 0)),
+        get_position(&positions, &player_id, (x, y), (1, 0)),
+        get_position(&positions, &player_id, (x, y), (2, 0)),
+    ];
+    let poi2 = vec![
+        get_position(&positions, &player_id, (x, y), (0, -2)),
+        get_position(&positions, &player_id, (x, y), (0, -1)),
+        get_position(&positions, &player_id, (x, y), (0, 1)),
+        get_position(&positions, &player_id, (x, y), (0, 2)),
+    ];
+    let poi3 = vec![
+        get_position(&positions, &player_id, (x, y), (1, 1)),
+        get_position(&positions, &player_id, (x, y), (2, 2)),
+        get_position(&positions, &player_id, (x, y), (-1, -1)),
+        get_position(&positions, &player_id, (x, y), (-2, -2)),
+    ];
+    let poi4 = vec![
+        get_position(&positions, &player_id, (x, y), (-1, 1)),
+        get_position(&positions, &player_id, (x, y), (-2, 2)),
+        get_position(&positions, &player_id, (x, y), (1, -1)),
+        get_position(&positions, &player_id, (x, y), (2, -2)),
+    ];
 
-    todo!()
+    if vec![poi1, poi2, poi3, poi4]
+        .iter()
+        .any(|poi| has_consecutives(poi, CONSECUTIVE_FOR_WIN as usize))
+    {
+        Connect4Result::WinningMove
+    } else {
+        Connect4Result::AllowedMove
+    }
+}
+
+fn get_position<T>(
+    positions: &HashMap<(u64, u8), T>,
+    player_id: &T,
+    coords: (u64, u8),
+    offset: (i8, i8),
+) -> Option<T>
+where
+    T: PartialEq + Clone,
+{
+    let (x, y) = coords;
+    let (offset_x, offset_y) = offset;
+    let (x, y) = (
+        x.checked_add_signed(offset_x as i64),
+        y.checked_add_signed(offset_y),
+    );
+
+    let Some(x) = x else {
+        return None;
+    };
+    let Some(y) = y else {
+        return None;
+    };
+
+    let position = positions.get(&(x, y));
+    match position {
+        Some(position) => {
+            if position == player_id {
+                Some(position.clone())
+            } else {
+                None
+            }
+        }
+        None => None,
+    }
+}
+
+fn has_consecutives<T>(vec: &Vec<T>, target: usize) -> bool
+where
+    T: PartialEq,
+{
+    let mut previous: Option<&T> = None;
+    let mut count = 0;
+
+    for v in vec {
+        if count == target {
+            return true;
+        }
+
+        if previous.is_none() {
+            previous = Some(v);
+            continue;
+        }
+
+        let current = Some(v);
+        if previous == current {
+            count += 1;
+        } else {
+            count = 0;
+        }
+
+        previous = current;
+    }
+
+    false
 }
