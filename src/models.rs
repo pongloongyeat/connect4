@@ -14,7 +14,7 @@ pub enum AppError {
 
     InternalError(Option<&'static str>),
 
-    GameDoesNotExist,
+    RoomDoesNotExist,
     MissingInviteCode,
     InvalidInviteCode,
     PlayerDoesNotExist,
@@ -63,8 +63,8 @@ impl From<AppError> for ApiError {
                 "999.001",
                 error.unwrap_or(DEFAULT_ERROR_MESSAGE),
             ),
-            AppError::GameDoesNotExist => {
-                (StatusCode::NOT_FOUND, "100.001", "Game does not exist.")
+            AppError::RoomDoesNotExist => {
+                (StatusCode::NOT_FOUND, "100.001", "Room does not exist.")
             }
             AppError::MissingInviteCode => {
                 (StatusCode::BAD_REQUEST, "100.002", "Missing invite code.")
@@ -123,7 +123,7 @@ impl Header for SessionToken {
     }
 }
 
-pub struct GameDetails {
+pub struct RoomDetails {
     pub id: i64,
     pub display_name: Option<String>,
     pub token_hash: Option<String>,
@@ -133,13 +133,13 @@ pub struct GameDetails {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GameListingResponse {
+pub struct RoomListingResponse {
     pub id: i64,
     pub display_name: Option<String>,
     pub player_count: i64,
 }
 
-pub struct CreateGame {
+pub struct CreateRoom {
     pub display_name: Option<String>,
     pub token_hash: Option<String>,
     pub is_private: bool,
@@ -147,7 +147,7 @@ pub struct CreateGame {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateGameRequest {
+pub struct CreateRoomRequest {
     pub display_name: Option<String>,
     #[serde(rename = "private")]
     pub is_private: bool,
@@ -155,7 +155,7 @@ pub struct CreateGameRequest {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateGameResponse {
+pub struct CreateRoomResponse {
     pub id: i64,
     pub display_name: Option<String>,
     pub invite_code: Option<String>,
@@ -163,7 +163,7 @@ pub struct CreateGameResponse {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JoinGameRequest {
+pub struct JoinRoomRequest {
     pub invite_code: Option<String>,
 }
 
@@ -181,7 +181,7 @@ pub struct CurrentPlayerResponse {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CurrentGameResponse {
+pub struct CurrentRoomResponse {
     pub id: i64,
     pub display_name: Option<String>,
     pub player_count: i64,

@@ -5,7 +5,7 @@ use crate::models::CurrentPlayer;
 
 pub async fn find_player(
     connection: &mut PgConnection,
-    game_id: i64,
+    room_id: i64,
     session_hash: String,
 ) -> Result<Option<CurrentPlayer>, sqlx::Error> {
     let result = sqlx::query_as!(
@@ -13,9 +13,9 @@ pub async fn find_player(
         r#"
         SELECT id, display_name
         FROM players
-        WHERE game_id = $1 AND session_hash = $2
+        WHERE room_id = $1 AND session_hash = $2
     "#,
-        game_id,
+        room_id,
         session_hash
     )
     .fetch_optional(connection)
@@ -26,20 +26,20 @@ pub async fn find_player(
 
 pub async fn create_player(
     connection: &mut PgConnection,
-    game_id: i64,
+    room_id: i64,
     session_hash: String,
 ) -> Result<CurrentPlayer, sqlx::Error> {
     let result = sqlx::query_as!(
         CurrentPlayer,
         r#"
         INSERT INTO players
-        (game_id, session_hash, joined_at)
+        (room_id, session_hash, joined_at)
         VALUES
         ($1, $2, $3)
         ON CONFLICT DO NOTHING
         RETURNING id, display_name
     "#,
-        game_id,
+        room_id,
         session_hash,
         Utc::now().naive_utc()
     )

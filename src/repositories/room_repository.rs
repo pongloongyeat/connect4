@@ -1,17 +1,17 @@
 use chrono::Utc;
 use sqlx::PgConnection;
 
-use crate::models::{CreateGame, GameDetails};
+use crate::models::{CreateRoom, RoomDetails};
 
-pub async fn find_active_game(
+pub async fn find_active_room(
     connection: &mut PgConnection,
     id: i64,
-) -> Result<Option<GameDetails>, sqlx::Error> {
+) -> Result<Option<RoomDetails>, sqlx::Error> {
     let result = sqlx::query_as!(
-        GameDetails,
+        RoomDetails,
         r#"
         SELECT id, display_name, token_hash, is_private, player_count
-        FROM games
+        FROM rooms
         WHERE id = $1 AND is_active = TRUE
     "#,
         id
@@ -22,16 +22,16 @@ pub async fn find_active_game(
     Ok(result)
 }
 
-pub async fn list_games_paginated(
+pub async fn list_rooms_paginated(
     connection: &mut PgConnection,
     offset: i32,
     limit: i32,
-) -> Result<Vec<GameDetails>, sqlx::Error> {
+) -> Result<Vec<RoomDetails>, sqlx::Error> {
     let result = sqlx::query_as!(
-        GameDetails,
+        RoomDetails,
         r#"
         SELECT id, token_hash, is_private, display_name, player_count
-        FROM games
+        FROM rooms
         WHERE is_active = TRUE
         ORDER BY player_count DESC
         LIMIT $1 OFFSET $2
@@ -45,13 +45,13 @@ pub async fn list_games_paginated(
     Ok(result)
 }
 
-pub async fn create_game(
+pub async fn create_room(
     connection: &mut PgConnection,
-    game: CreateGame,
-) -> Result<GameDetails, sqlx::Error> {
+    game: CreateRoom,
+) -> Result<RoomDetails, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        INSERT INTO games
+        INSERT INTO rooms
         (created_at, display_name, token_hash, is_private)
         VALUES
         ($1, $2, $3, $4)
@@ -65,7 +65,7 @@ pub async fn create_game(
     .fetch_one(connection)
     .await?;
 
-    Ok(GameDetails {
+    Ok(RoomDetails {
         id: result.id,
         token_hash: game.token_hash,
         is_private: game.is_private,

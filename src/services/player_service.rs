@@ -3,20 +3,20 @@ use sqlx::{Connection, PgPool};
 
 use crate::{
     models::{
-        AppError, AppResult, CurrentGameResponse, CurrentPlayerResponse, JoinGameRequest, MakeMove,
+        AppError, AppResult, CurrentPlayerResponse, CurrentRoomResponse, JoinRoomRequest, MakeMove,
     },
-    repositories::{game_repository, player_repository},
+    repositories::{player_repository, room_repository},
     utils,
 };
 
 async fn get_current_player_id(
     redis: &mut ConnectionManager,
     pool: PgPool,
-    game_id: i64,
+    room_id: i64,
     session_token: String,
 ) -> AppResult<i64> {
     let player_id = redis
-        .get_int(format!("game:{game_id}:sessions:{session_token}"))
+        .get_int(format!("room:{room_id}:sessions:{session_token}"))
         .await
         .inspect_err(|err| tracing::error!("{}", err.to_string()))
         .map_err(AppError::from)?;
@@ -27,7 +27,7 @@ async fn get_current_player_id(
     // Fallback to DB
     let session_hash = utils::sha256_hash(&session_token);
     let mut connection = pool.acquire().await.map_err(AppError::from)?;
-    let player = player_repository::find_player(&mut connection, game_id, session_hash)
+    let player = player_repository::find_player(&mut connection, room_id, session_hash)
         .await
         .inspect_err(|err| tracing::error!("{}", err.to_string()))
         .map_err(AppError::from)?;
@@ -38,27 +38,27 @@ async fn get_current_player_id(
     }
 }
 
-pub async fn join_game(
+pub async fn join_room(
     pool: PgPool,
-    game_id: i64,
+    room_id: i64,
     session_token: String,
-    request: JoinGameRequest,
-) -> AppResult<CurrentGameResponse> {
+    request: JoinRoomRequest,
+) -> AppResult<CurrentRoomResponse> {
     let mut connection = pool.acquire().await.map_err(AppError::from)?;
-    let game = game_repository::find_active_game(&mut connection, game_id)
+    let room = room_repository::find_active_room(&mut connection, room_id)
         .await
         .inspect_err(|err| tracing::error!("{}", err.to_string()))
         .map_err(AppError::from)?;
-    let Some(game) = game else {
-        return Err(AppError::GameDoesNotExist);
+    let Some(room) = room else {
+        return Err(AppError::RoomDoesNotExist);
     };
 
-    if game.is_private {
-        let token_hash = game.token_hash;
+    if room.is_private {
+        let token_hash = room.token_hash;
         let Some(token_hash) = token_hash else {
-            tracing::error!("Missing token hash for private game {}", game_id);
+            tracing::error!("Missing token hash for private room {}", room_id);
             return Err(AppError::InternalError(Some(
-                "Game has missing token hash.",
+                "room has missing token hash.",
             )));
         };
 
@@ -75,7 +75,7 @@ pub async fn join_game(
     let session_hash = utils::sha256_hash(&session_token);
     let mut tx = connection.begin().await.map_err(AppError::from)?;
     // TODO: Session token should be hashed?
-    let player = player_repository::create_player(&mut tx, game_id, session_hash)
+    let player = player_repository::create_player(&mut tx, room_id, session_hash)
         .await
         .inspect_err(|err| tracing::error!("{}", err.to_string()))
         .map_err(AppError::from)?;
@@ -86,10 +86,10 @@ pub async fn join_game(
 
     // TODO: Run job to update player count
 
-    Ok(CurrentGameResponse {
-        id: game_id,
-        display_name: game.display_name,
-        player_count: game.player_count + 1,
+    Ok(CurrentRoomResponse {
+        id: room_id,
+        display_name: room.display_name,
+        player_count: room.player_count + 1,
         current_player: CurrentPlayerResponse {
             id: player.id,
             display_name: player.display_name,
@@ -100,11 +100,11 @@ pub async fn join_game(
 pub async fn make_move(
     redis: &mut ConnectionManager,
     pool: PgPool,
-    game_id: i64,
+    room_id: i64,
     session_token: String,
     player_move: MakeMove,
 ) -> AppResult<()> {
-    let player_id = get_current_player_id(redis, pool, game_id, session_token).await?;
+    let player_id = get_current_player_id(redis, pool, room_id, session_token).await?;
 
     todo!()
 }
