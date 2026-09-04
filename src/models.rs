@@ -1,128 +1,7 @@
-use axum::{
-    Json,
-    http::{HeaderName, HeaderValue, StatusCode},
-    response::IntoResponse,
-};
-use axum_extra::headers::Header;
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-pub type AppResult<T> = Result<T, AppError>;
-
-pub enum AppError {
-    DatabaseError(sqlx::Error),
-    RedisError(redis::RedisError),
-
-    InternalError(Option<&'static str>),
-
-    RoomDoesNotExist,
-    MissingInviteCode,
-    InvalidInviteCode,
-    PlayerDoesNotExist,
-}
-
-impl From<sqlx::Error> for AppError {
-    fn from(value: sqlx::Error) -> Self {
-        Self::DatabaseError(value)
-    }
-}
-
-impl From<redis::RedisError> for AppError {
-    fn from(value: redis::RedisError) -> Self {
-        Self::RedisError(value)
-    }
-}
-
-pub type ApiResult<T> = Result<T, ApiError>;
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ApiError {
-    #[serde(skip)]
-    status_code: StatusCode,
-    code: String,
-    message: String,
-}
-
-const DEFAULT_ERROR_MESSAGE: &'static str = "An unknown error has occured.";
-
-impl From<AppError> for ApiError {
-    fn from(value: AppError) -> Self {
-        let (status_code, code, message) = match value {
-            AppError::DatabaseError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "999.999",
-                DEFAULT_ERROR_MESSAGE,
-            ),
-            AppError::RedisError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "999.998",
-                DEFAULT_ERROR_MESSAGE,
-            ),
-            AppError::InternalError(error) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "999.001",
-                error.unwrap_or(DEFAULT_ERROR_MESSAGE),
-            ),
-            AppError::RoomDoesNotExist => {
-                (StatusCode::NOT_FOUND, "100.001", "Room does not exist.")
-            }
-            AppError::MissingInviteCode => {
-                (StatusCode::BAD_REQUEST, "100.002", "Missing invite code.")
-            }
-            AppError::InvalidInviteCode => {
-                (StatusCode::BAD_REQUEST, "100.003", "Invalid invite code.")
-            }
-            AppError::PlayerDoesNotExist => {
-                (StatusCode::NOT_FOUND, "101.001", "Player does not exist.")
-            }
-        };
-
-        Self {
-            status_code,
-            code: code.to_string(),
-            message: message.to_string(),
-        }
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
-        (self.status_code, Json(self)).into_response()
-    }
-}
-
-pub struct SessionToken(pub String);
-
-impl Header for SessionToken {
-    fn name() -> &'static axum::http::HeaderName {
-        static NAME: HeaderName = HeaderName::from_static("x-session-token");
-        &NAME
-    }
-
-    fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
-    where
-        Self: Sized,
-        I: Iterator<Item = &'i axum::http::HeaderValue>,
-    {
-        let value = values
-            .next()
-            .ok_or_else(axum_extra::headers::Error::invalid)?;
-
-        let token = value
-            .to_str()
-            .map_err(|_| axum_extra::headers::Error::invalid())?;
-
-        Ok(SessionToken(token.to_string()))
-    }
-
-    fn encode<E: Extend<axum::http::HeaderValue>>(&self, values: &mut E) {
-        let value =
-            HeaderValue::try_from(&self.0).expect("SessionToken contains an invalid header value");
-
-        values.extend(std::iter::once(value));
-    }
-}
+use serde::{Deserialize, Serialize, de::Error as DeError, ser::SerializeMap};
 
 pub struct RoomDetails {
     pub id: i64,
@@ -175,6 +54,92 @@ pub struct RefreshSessionRequest {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MakeMoveRequest {
+    pub column: u64,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct MakeMove {
-    column: u64,
+    pub room_id: i64,
+    pub player_id: i64,
+    pub column: u64,
+}
+
+#[derive(Clone)]
+pub struct BoardState<T> {
+    // Maps a coordinate (x, y) to a player ID
+    pub positions: HashMap<(u64, u8), T>,
+
+    // Maps an x-coordinate to its occupied height
+    pub heights: HashMap<u64, u8>,
+}
+
+const COORD_DELIMITER: &'static str = ",";
+
+impl<T> Serialize for BoardState<T>
+where
+    T: Serialize + Clone,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(2))?;
+        let positions = self
+            .positions
+            .clone()
+            .into_iter()
+            .map(|((x, y), v)| (format!("{x}{COORD_DELIMITER}{y}"), v))
+            .collect::<HashMap<String, T>>();
+
+        map.serialize_entry("positions", &positions)?;
+        map.serialize_entry("heights", &self.heights)?;
+
+        map.end()
+    }
+}
+
+impl<'de, T> Deserialize<'de> for BoardState<T>
+where
+    T: Deserialize<'de> + Clone,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct StoredBoardState<T> {
+            positions: HashMap<String, T>,
+            heights: HashMap<u64, u8>,
+        }
+
+        let stored = StoredBoardState::<T>::deserialize(deserializer)?;
+        let positions = stored
+            .positions
+            .clone()
+            .iter()
+            .map(|(coords, v)| {
+                let (x, y) = coords.split_once(COORD_DELIMITER).ok_or_else(|| {
+                    tracing::error!("Failed to split coordinate: {coords}");
+                    D::Error::custom("invalid coordinate")
+                })?;
+
+                let x = x
+                    .parse::<u64>()
+                    .inspect_err(|err| tracing::error!("Invalid value for coordinate: {x}, {err}"))
+                    .map_err(|_| D::Error::custom("invalid x coordinate"))?;
+                let y = y
+                    .parse::<u8>()
+                    .inspect_err(|err| tracing::error!("Invalid value for coordinate: {y}, {err}"))
+                    .map_err(|_| D::Error::custom("invalid y coordinate"))?;
+
+                Ok(((x, y), v.to_owned()))
+            })
+            .collect::<Result<HashMap<_, _>, D::Error>>()?;
+
+        Ok(BoardState {
+            positions,
+            heights: stored.heights,
+        })
+    }
 }

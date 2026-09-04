@@ -7,9 +7,11 @@ use axum::{
 use axum_extra::TypedHeader;
 
 use crate::{
-    models::{ApiError, ApiResult, CreateRoomResponse, CurrentRoomResponse, SessionToken},
+    error::{ApiError, ApiResult},
+    models::{CreateRoomResponse, CurrentRoomResponse},
     services::room_service,
     state::AppState,
+    utils::axum::SessionToken,
 };
 
 pub fn router(state: AppState) -> Router {

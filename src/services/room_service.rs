@@ -1,10 +1,8 @@
 use sqlx::{Connection, PgPool};
 
 use crate::{
-    models::{
-        AppError, AppResult, CreateRoom, CreateRoomResponse, CurrentPlayerResponse,
-        CurrentRoomResponse,
-    },
+    error::{AppError, AppResult},
+    models::{CreateRoom, CreateRoomResponse, CurrentPlayerResponse, CurrentRoomResponse},
     repositories::room_repository,
     services::{player_service, session_service},
     utils,

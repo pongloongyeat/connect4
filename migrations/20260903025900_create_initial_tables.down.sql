@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS refresh_tokens;
 
+DROP SEQUENCE IF EXISTS players_ref_no_seq;
+
 DROP TABLE IF EXISTS players;
 
 DROP TABLE IF EXISTS rooms;

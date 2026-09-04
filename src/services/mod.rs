@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use crate::utils::Claims;
 
 pub mod connect4_engine;
+pub mod game_service;
 pub mod player_service;
 pub mod room_service;
 pub mod session_service;

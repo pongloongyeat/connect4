@@ -8,7 +8,8 @@ pub async fn find_player_id(
 ) -> Result<Option<i64>, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        SELECT player_id FROM refresh_tokens
+        SELECT player_id AS "player_id!"
+        FROM refresh_tokens
         WHERE
             session_hash = $1
             AND room_id = $2

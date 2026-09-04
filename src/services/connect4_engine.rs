@@ -1,15 +1,9 @@
 use std::collections::HashMap;
 
+use crate::models::BoardState;
+
 const MAX_BOARD_HEIGHT: u8 = 6;
 const CONSECUTIVE_FOR_WIN: u8 = 4;
-
-pub struct BoardState<T> {
-    // Maps a coordinate (x, y) to a player ID
-    positions: HashMap<(u64, u8), T>,
-
-    // Maps an x-coordinate to its occupied height
-    heights: HashMap<u64, u8>,
-}
 
 pub struct PlayerMove<T> {
     pub player_id: T,
@@ -22,19 +16,31 @@ pub enum Connect4Result {
     IllegalMove(&'static str),
 }
 
-pub fn make_move<T>(board_state: BoardState<T>, current_move: PlayerMove<T>) -> Connect4Result
+pub fn make_move<T>(
+    board_state: BoardState<T>,
+    current_move: PlayerMove<T>,
+) -> (Connect4Result, BoardState<T>)
 where
     T: PartialEq + Clone,
 {
     // Drop token into board
-    let positions = board_state.positions;
+    let BoardState { positions, heights } = board_state.clone();
     let PlayerMove { player_id, x } = current_move;
-    let current_height = board_state.heights.get(&x).unwrap_or(&0).to_owned();
+    let current_height = heights.get(&x).unwrap_or(&0).to_owned();
     let y = current_height;
 
     if y + 1 > MAX_BOARD_HEIGHT {
-        return Connect4Result::IllegalMove("Exceeded board height");
+        return (
+            Connect4Result::IllegalMove("Exceeded board height"),
+            board_state,
+        );
     }
+
+    // Insert into board
+    let mut positions = positions;
+    positions.insert((x, y), player_id.clone());
+    let mut heights = heights;
+    heights.insert(x, y + 1);
 
     let poi1 = vec![
         get_position(&positions, &player_id, (x, y), (-2, 0)),
@@ -61,14 +67,20 @@ where
         get_position(&positions, &player_id, (x, y), (2, -2)),
     ];
 
-    if vec![poi1, poi2, poi3, poi4]
+    let result = if vec![poi1, poi2, poi3, poi4]
         .iter()
         .any(|poi| has_consecutives(poi, CONSECUTIVE_FOR_WIN as usize))
     {
         Connect4Result::WinningMove
     } else {
         Connect4Result::AllowedMove
-    }
+    };
+
+    let updated_board_state = BoardState {
+        positions: positions,
+        heights: heights,
+    };
+    (result, updated_board_state)
 }
 
 fn get_position<T>(

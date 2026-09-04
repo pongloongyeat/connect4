@@ -1,7 +1,8 @@
 use sqlx::{Connection, PgConnection};
 
 use crate::{
-    models::{AppError, AppResult, CurrentPlayer},
+    error::{AppError, AppResult},
+    models::CurrentPlayer,
     repositories::{player_repository, refresh_token_repository},
     utils,
 };

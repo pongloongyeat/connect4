@@ -5,7 +5,7 @@ CREATE TABLE rooms (
     active BOOLEAN NOT NULL DEFAULT TRUE,
     ended_at TIMESTAMP,
     player_count INT NOT NULL DEFAULT 0,
-    moves_played JSONB NOT NULL DEFAULT '{}'::jsonb
+    game_state JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE UNIQUE INDEX uc_room_invite_code_hash ON rooms (invite_code_hash)

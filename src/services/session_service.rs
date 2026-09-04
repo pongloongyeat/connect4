@@ -3,7 +3,7 @@ use sqlx::{Connection, PgConnection};
 use uuid::Uuid;
 
 use crate::{
-    models::{AppError, AppResult},
+    error::{AppError, AppResult},
     repositories::refresh_token_repository,
     services::SessionDetails,
     utils::{self, Claims},

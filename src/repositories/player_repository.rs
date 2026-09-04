@@ -23,7 +23,7 @@ pub async fn find_player_by_id(
 }
 
 pub async fn player_ref_no(connection: &mut PgConnection) -> Result<i64, sqlx::Error> {
-    let sequence = sqlx::query!("SELECT nextval('players_ref_no_seq') AS \"sequence!\"")
+    let sequence = sqlx::query!(r#"SELECT nextval('players_ref_no_seq') AS "sequence!""#)
         .fetch_one(connection)
         .await?;
 
@@ -52,4 +52,22 @@ pub async fn create_player(
     .await?;
 
     Ok(result)
+}
+
+pub async fn set_winning_player(
+    connection: &mut PgConnection,
+    player_id: i64,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        UPDATE players
+        SET winner = TRUE
+        WHERE id = $1
+    "#,
+        player_id
+    )
+    .execute(connection)
+    .await?;
+
+    Ok(result.rows_affected())
 }
