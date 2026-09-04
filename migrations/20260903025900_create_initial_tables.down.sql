@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS refresh_tokens;
+
 DROP TABLE IF EXISTS players;
 
-DROP TABLE IF EXISTS games;
+DROP TABLE IF EXISTS rooms;

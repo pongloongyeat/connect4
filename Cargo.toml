@@ -9,6 +9,7 @@ axum-extra = { version = "0.12.6", features = ["typed-header"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
 hex = "0.4.3"
+jsonwebtoken = "11.0.0"
 rand = "0.10.2"
 redis = { version = "1.6.0", features = ["aio", "connection-manager", "tokio-comp"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -17,3 +18,4 @@ sqlx = { version = "0.9.0", features = ["chrono", "postgres", "runtime-tokio"] }
 tokio = { version = "1.53.1", features = ["full"] }
 tower-http = { version = "0.7.1", features = ["tracing"] }
 tracing = "0.1.44"
+uuid = { version = "1.26.0", features = ["v4"] }

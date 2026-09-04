@@ -1,17 +1,13 @@
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::post,
 };
 use axum_extra::TypedHeader;
-use serde::Deserialize;
 
 use crate::{
-    models::{
-        ApiError, ApiResult, CreateRoomRequest, CreateRoomResponse, CurrentRoomResponse,
-        JoinRoomRequest, RoomListingResponse, SessionToken,
-    },
+    models::{ApiError, ApiResult, CreateRoomResponse, CurrentRoomResponse, SessionToken},
     services::room_service,
     state::AppState,
 };
@@ -19,49 +15,28 @@ use crate::{
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/rooms", post(create_room))
-        .route("/rooms", get(list_rooms))
-        .route("/rooms/{id}/join", post(join_room))
+        .route("/rooms/{invite_code}/join", post(join_room))
         .with_state(state)
 }
 
 #[axum::debug_handler]
 async fn create_room(
     State(state): State<AppState>,
-    Json(request): Json<CreateRoomRequest>,
 ) -> ApiResult<(StatusCode, Json<CreateRoomResponse>)> {
-    let response = room_service::create_room(state.pool, request)
+    let response = room_service::create_room(&state.pool)
         .await
         .map_err(ApiError::from)?;
 
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-#[derive(Clone, Copy, Deserialize)]
-struct ListGamesQuery {
-    offset: Option<i32>,
-    limit: Option<i32>,
-}
-
-#[axum::debug_handler]
-async fn list_rooms(
-    State(state): State<AppState>,
-    Query(query): Query<ListGamesQuery>,
-) -> ApiResult<Json<Vec<RoomListingResponse>>> {
-    let response = room_service::list_rooms(state.pool, query.offset, query.limit)
-        .await
-        .map_err(ApiError::from)?;
-
-    Ok(Json(response))
-}
-
 #[axum::debug_handler]
 async fn join_room(
     State(state): State<AppState>,
-    Path(id): Path<i64>,
+    Path(invite_code): Path<String>,
     TypedHeader(SessionToken(token)): TypedHeader<SessionToken>,
-    Json(request): Json<JoinRoomRequest>,
 ) -> ApiResult<Json<CurrentRoomResponse>> {
-    let response = room_service::join_room(state.pool, id, token, request)
+    let response = room_service::join_room(&state.pool, &token, &"TOKEN", &invite_code)
         .await
         .map_err(ApiError::from)?;
 

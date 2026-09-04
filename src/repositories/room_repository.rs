@@ -5,16 +5,16 @@ use crate::models::{CreateRoom, RoomDetails};
 
 pub async fn find_active_room(
     connection: &mut PgConnection,
-    id: i64,
+    invite_code_hash: &str,
 ) -> Result<Option<RoomDetails>, sqlx::Error> {
     let result = sqlx::query_as!(
         RoomDetails,
         r#"
-        SELECT id, display_name, token_hash, is_private, player_count
+        SELECT id, invite_code_hash, player_count
         FROM rooms
-        WHERE id = $1 AND is_active = TRUE
+        WHERE invite_code_hash = $1 AND active = TRUE
     "#,
-        id
+        invite_code_hash
     )
     .fetch_optional(connection)
     .await?;
@@ -22,54 +22,27 @@ pub async fn find_active_room(
     Ok(result)
 }
 
-pub async fn list_rooms_paginated(
-    connection: &mut PgConnection,
-    offset: i32,
-    limit: i32,
-) -> Result<Vec<RoomDetails>, sqlx::Error> {
-    let result = sqlx::query_as!(
-        RoomDetails,
-        r#"
-        SELECT id, token_hash, is_private, display_name, player_count
-        FROM rooms
-        WHERE is_active = TRUE
-        ORDER BY player_count DESC
-        LIMIT $1 OFFSET $2
-        "#,
-        limit as i64,
-        offset as i64,
-    )
-    .fetch_all(connection)
-    .await?;
-
-    Ok(result)
-}
-
 pub async fn create_room(
     connection: &mut PgConnection,
-    game: CreateRoom,
+    room: &CreateRoom,
 ) -> Result<RoomDetails, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         INSERT INTO rooms
-        (created_at, display_name, token_hash, is_private)
+        (created_at, invite_code_hash)
         VALUES
-        ($1, $2, $3, $4)
+        ($1, $2)
         RETURNING id
     "#,
         Utc::now().naive_utc(),
-        game.display_name,
-        game.token_hash,
-        game.is_private,
+        room.invite_code_hash,
     )
     .fetch_one(connection)
     .await?;
 
     Ok(RoomDetails {
         id: result.id,
-        token_hash: game.token_hash,
-        is_private: game.is_private,
-        display_name: game.display_name,
+        invite_code_hash: room.invite_code_hash.to_string(),
         player_count: 0,
     })
 }

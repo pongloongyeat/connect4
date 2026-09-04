@@ -13,5 +13,5 @@ async fn main() {
         .expect("Failed to bind to address");
     axum::serve(listener, router)
         .await
-        .expect("Failed to servie app");
+        .expect("Failed to serve app");
 }

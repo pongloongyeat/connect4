@@ -4,6 +4,7 @@ use axum::{
     response::IntoResponse,
 };
 use axum_extra::headers::Header;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub type AppResult<T> = Result<T, AppError>;
@@ -125,50 +126,24 @@ impl Header for SessionToken {
 
 pub struct RoomDetails {
     pub id: i64,
-    pub display_name: Option<String>,
-    pub token_hash: Option<String>,
-    pub is_private: bool,
-    pub player_count: i64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RoomListingResponse {
-    pub id: i64,
-    pub display_name: Option<String>,
+    pub invite_code_hash: String,
     pub player_count: i64,
 }
 
 pub struct CreateRoom {
-    pub display_name: Option<String>,
-    pub token_hash: Option<String>,
-    pub is_private: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateRoomRequest {
-    pub display_name: Option<String>,
-    #[serde(rename = "private")]
-    pub is_private: bool,
+    pub invite_code_hash: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRoomResponse {
     pub id: i64,
-    pub display_name: Option<String>,
-    pub invite_code: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JoinRoomRequest {
-    pub invite_code: Option<String>,
+    pub invite_code: String,
 }
 
 pub struct CurrentPlayer {
     pub id: i64,
+    pub ref_no: i64,
     pub display_name: Option<String>,
 }
 
@@ -177,15 +152,25 @@ pub struct CurrentPlayer {
 pub struct CurrentPlayerResponse {
     pub id: i64,
     pub display_name: Option<String>,
+    pub access_token: String,
+    pub access_token_expires_at: DateTime<Utc>,
+    pub refresh_token: String,
+    pub refresh_token_expires_at: DateTime<Utc>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentRoomResponse {
     pub id: i64,
-    pub display_name: Option<String>,
     pub player_count: i64,
     pub current_player: CurrentPlayerResponse,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshSessionRequest {
+    pub access_token: String,
+    pub refresh_token: String,
 }
 
 #[derive(Serialize)]

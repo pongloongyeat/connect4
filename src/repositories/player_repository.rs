@@ -3,23 +3,49 @@ use sqlx::PgConnection;
 
 use crate::models::CurrentPlayer;
 
+pub async fn find_player_by_id(
+    connection: &mut PgConnection,
+    id: i64,
+) -> Result<Option<CurrentPlayer>, sqlx::Error> {
+    let result = sqlx::query_as!(
+        CurrentPlayer,
+        r#"
+        SELECT id, ref_no, display_name
+        FROM players
+        WHERE id = $1
+    "#,
+        id,
+    )
+    .fetch_optional(connection)
+    .await?;
+
+    Ok(result)
+}
+
+pub async fn player_ref_no(connection: &mut PgConnection) -> Result<i64, sqlx::Error> {
+    let sequence = sqlx::query!("SELECT nextval('players_ref_no_seq') AS \"sequence!\"")
+        .fetch_one(connection)
+        .await?;
+
+    Ok(sequence.sequence)
+}
+
 pub async fn create_player(
     connection: &mut PgConnection,
     room_id: i64,
-    session_hash: String,
+    ref_no: i64,
 ) -> Result<CurrentPlayer, sqlx::Error> {
     let result = sqlx::query_as!(
         CurrentPlayer,
         r#"
         INSERT INTO players
-        (room_id, session_hash, joined_at)
+        (room_id, ref_no, joined_at)
         VALUES
         ($1, $2, $3)
-        ON CONFLICT DO NOTHING
-        RETURNING id, display_name
+        RETURNING id, ref_no, display_name
     "#,
         room_id,
-        session_hash,
+        ref_no,
         Utc::now().naive_utc()
     )
     .fetch_one(connection)
